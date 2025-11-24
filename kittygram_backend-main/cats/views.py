@@ -12,7 +12,13 @@ class CatViewSet(viewsets.ModelViewSet):
     pagination_class = PageNumberPagination 
 
     def perform_create(self, serializer):
-        serializer.save(owner=self.request.user) 
+        serializer.save(owner=self.request.user)
+    
+    def get_serializer_context(self):
+        """Передаем request в контекст сериализатора для построения полных URL"""
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context 
 
 
 class AchievementViewSet(viewsets.ModelViewSet):

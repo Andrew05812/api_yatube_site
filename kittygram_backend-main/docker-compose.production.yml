@@ -1,0 +1,63 @@
+services:
+  db:
+    image: postgres:13
+    container_name: db
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-kittygram}
+      POSTGRES_USER: ${POSTGRES_USER:-kittygram_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kittygram_password}
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: backend
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    env_file:
+      - .env
+    environment:
+      DB_ENGINE: django.db.backends.postgresql
+      DB_NAME: ${POSTGRES_DB:-kittygram}
+      POSTGRES_USER: ${POSTGRES_USER:-kittygram_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kittygram_password}
+      DB_HOST: db
+      DB_PORT: 5432
+    depends_on:
+      - db
+    restart: unless-stopped
+    command: sh -c "python manage.py migrate --noinput && python manage.py collectstatic --noinput && gunicorn kittygram_backend.wsgi:application --bind 0.0.0.0:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: gateway
+    ports:
+      - "80:80"
+    volumes:
+      - static_volume:/static
+      - media_volume:/media
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+
+volumes:
+  static_volume:
+  media_volume:
+  pg_data:
+

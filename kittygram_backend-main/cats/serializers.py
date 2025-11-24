@@ -53,6 +53,18 @@ class CatSerializer(serializers.ModelSerializer):
             'image'
             )
         read_only_fields = ('owner',)
+    
+    def to_representation(self, instance):
+        """Добавляем полный URL для изображения"""
+        representation = super().to_representation(instance)
+        if instance.image:
+            request = self.context.get('request')
+            if request:
+                representation['image'] = request.build_absolute_uri(instance.image.url)
+            else:
+                # Если нет request (например, в тестах), используем относительный URL
+                representation['image'] = instance.image.url
+        return representation
 
     def get_age(self, obj):
         return dt.datetime.now().year - obj.birth_year

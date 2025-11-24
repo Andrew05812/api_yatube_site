@@ -5,7 +5,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'CHANGE_ME_IN_PRODUCTION')
 
-DEBUG = os.getenv('DEBUG', 'False').lower() in ('1', 'true', 'yes')
+DEBUG = os.getenv('DEBUG', 'True').lower() in ('1', 'true', 'yes')  # По умолчанию True для разработки
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
 
@@ -41,7 +41,7 @@ ROOT_URLCONF = 'kittygram_backend.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'frontend' / 'build'] if (BASE_DIR / 'frontend' / 'build').exists() else [],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -73,6 +73,19 @@ if DATABASE_URL:
 	except Exception:
 		# Fallback to default if parsing fails
 		pass
+
+# PostgreSQL configuration for Docker
+if os.getenv('DB_ENGINE') == 'django.db.backends.postgresql':
+	DATABASES = {
+		'default': {
+			'ENGINE': 'django.db.backends.postgresql',
+			'NAME': os.getenv('DB_NAME', 'kittygram'),
+			'USER': os.getenv('POSTGRES_USER', 'kittygram_user'),
+			'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'kittygram_password'),
+			'HOST': os.getenv('DB_HOST', 'db'),
+			'PORT': os.getenv('DB_PORT', '5432'),
+		}
+	}
 
 
 # Password validation
@@ -128,12 +141,42 @@ REST_FRAMEWORK = {
 
 }
 
+# Настройки Djoser для работы с пользователями
+DJOSER = {
+    'SERIALIZERS': {
+        'user_create': 'djoser.serializers.UserCreateSerializer',
+        'user': 'djoser.serializers.UserSerializer',
+        'current_user': 'djoser.serializers.UserSerializer',
+    },
+    'PERMISSIONS': {
+        'user': ['rest_framework.permissions.IsAuthenticated'],
+        'user_list': ['rest_framework.permissions.AllowAny'],
+        'user_create': ['rest_framework.permissions.AllowAny'],  # Разрешаем создание пользователей без аутентификации
+    },
+    'HIDE_USERS': False,  # Показывать пользователей
+}
+
 # CSRF trusted origins (add common Railway domain patterns by default)
 default_csrf = ['https://*.up.railway.app', 'https://*.railway.app']
 CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', ','.join(default_csrf)).split(',')
 
 # CORS settings
-if os.getenv('CORS_ALLOW_ALL_ORIGINS', 'false').lower() in ('1', 'true', 'yes'):
+# Для разработки всегда разрешаем все источники
+if DEBUG:
 	CORS_ALLOW_ALL_ORIGINS = True
 else:
-	CORS_ALLOWED_ORIGINS = [o for o in os.getenv('CORS_ALLOWED_ORIGINS', '').split(',') if o]
+	# В production используем настройки из переменных окружения
+	if os.getenv('CORS_ALLOW_ALL_ORIGINS', 'false').lower() in ('1', 'true', 'yes'):
+		CORS_ALLOW_ALL_ORIGINS = True
+	else:
+		CORS_ALLOWED_ORIGINS = [o for o in os.getenv('CORS_ALLOWED_ORIGINS', '').split(',') if o]
+
+# Настройки для обслуживания React приложения
+FRONTEND_DIR = BASE_DIR / 'frontend'
+REACT_BUILD_DIR = FRONTEND_DIR / 'build'
+
+# Добавляем папку build в STATICFILES_DIRS для production
+if REACT_BUILD_DIR.exists():
+	STATICFILES_DIRS = [
+		REACT_BUILD_DIR / 'static',
+	]
